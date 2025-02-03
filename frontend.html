@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App 🧠</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex flex-col items-center p-6 bg-gray-100 min-h-screen">
+    <h1 class="text-3xl font-bold text-blue-600">Quiz App 🧠</h1>
+
+    <!-- Login Section -->
+    <div id="loginContainer" class="mt-6 p-4 bg-white shadow rounded w-full max-w-md">
+        <h2 class="text-xl font-semibold">Login</h2>
+        <input id="userId" type="text" class="mt-2 p-2 border rounded w-full" placeholder="Enter User ID">
+        <button onclick="login()" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full">Login</button>
+    </div>
+
+    <!-- Quiz Selection -->
+    <div id="quizSelection" class="mt-4 hidden">
+        <input id="quizId" type="text" class="p-2 border rounded" placeholder="Enter Quiz ID">
+        <button onclick="fetchQuiz()" class="px-4 py-2 bg-blue-500 text-white rounded">Load Quiz</button>
+        <select id="savedQuizzes" class="p-2 border rounded ml-2 hidden" onchange="loadSavedQuiz()">
+            <option value="">Select a past quiz</option>
+        </select>
+    </div>
+
+    <!-- Quiz Section -->
+    <div id="quizContainer" class="mt-6 p-4 bg-white shadow rounded w-full max-w-lg hidden">
+        <h2 id="quizTitle" class="text-2xl font-semibold"></h2>
+        <div id="questionsContainer"></div>
+        <button id="submitButton" onclick="submitAnswers()" class="mt-4 px-4 py-2 bg-green-500 text-white rounded w-full">
+            Submit Answers 🚀
+        </button>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultContainer" class="mt-6 p-4 bg-white shadow rounded w-full max-w-lg hidden">
+        <h2 class="text-2xl font-semibold text-green-600">Results 🎯</h2>
+        <p id="resultScore"></p>
+        <p id="resultRank"></p>
+        <p id="resultPercentage"></p>
+        <p id="resultUsers"></p>
+        <p id="resultMessage" class="italic"></p>
+        <button onclick="fetchResults()" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full">See My Ranking 📊</button>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:9796"; // Replace with your API base URL
+        let userId = localStorage.getItem("userId");
+        let quizId = "";
+        let answers = {};
+        let savedQuizzes = JSON.parse(localStorage.getItem("savedQuizzes")) || {};
+
+        function login() {
+            const enteredUserId = document.getElementById("userId").value;
+            if (!enteredUserId) {
+                alert("Please enter a User ID!");
+                return;
+            }
+            localStorage.setItem("userId", enteredUserId);
+            userId = enteredUserId;
+            document.getElementById("loginContainer").classList.add("hidden");
+            document.getElementById("quizSelection").classList.remove("hidden");
+            loadSavedQuizOptions();
+        }
+
+        function fetchQuiz() {
+            quizId = document.getElementById("quizId").value;
+            if (!userId || !quizId) return;
+
+            fetch(`${API_BASE}/get-quiz/${quizId}`, {
+                headers: { "userId": userId },
+            })
+            .then(response => response.json())
+            .then(quiz => {
+                document.getElementById("quizTitle").textContent = quiz.title;
+                const questionsContainer = document.getElementById("questionsContainer");
+                questionsContainer.innerHTML = "";
+                answers = savedQuizzes[quizId]?.answers || {};
+
+                quiz.questions.forEach(q => {
+                    const questionEl = document.createElement("div");
+                    questionEl.classList.add("mt-4");
+                    questionEl.innerHTML = `<p class="font-medium">${q.text}</p>`;
+
+                    q.choices.forEach(choice => {
+                        const choiceEl = document.createElement("label");
+                        choiceEl.classList.add("flex", "items-center", "gap-2");
+                        const isSubmitted = savedQuizzes[quizId]?.submitted ? "disabled" : "";
+
+                        choiceEl.innerHTML = `
+                            <input type="radio" name="${q.id}" value="${choice}" ${answers[q.id] === choice ? "checked" : ""} ${isSubmitted} onchange="selectAnswer('${q.id}', '${choice}')">
+                            ${choice}
+                        `;
+                        questionEl.appendChild(choiceEl);
+                    });
+
+                    questionsContainer.appendChild(questionEl);
+                });
+
+                document.getElementById("quizContainer").classList.remove("hidden");
+
+                // Disable submit button if quiz was already submitted
+                checkSubmissionStatus();
+                
+                document.getElementById("resultContainer").classList.remove("hidden");
+            })
+            .catch(error => console.error("Error fetching quiz:", error));
+        }
+
+        function selectAnswer(qId, choice) {
+            answers[qId] = choice;
+        }
+
+        function submitAnswers() {
+            if (!quizId || Object.keys(answers).length === 0) {
+                alert("Please answer all questions!");
+                return;
+            }
+
+            fetch(`${API_BASE}/submit-answers/${quizId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "userId": userId },
+                body: JSON.stringify({ answers: Object.values(answers) }),
+            })
+            .then(() => {
+                alert("Answers submitted successfully! ✅");
+                savedQuizzes[quizId] = { answers, submitted: true };
+                localStorage.setItem("savedQuizzes", JSON.stringify(savedQuizzes));
+                checkSubmissionStatus();
+                fetchResults();
+            })
+            .catch(error => console.error("Error submitting answers:", error));
+        }
+
+        function fetchResults() {
+            if (!quizId) return;
+
+            fetch(`${API_BASE}/get-results/${quizId}`, {
+                headers: { "userId": userId },
+            })
+            .then(response => response.json())
+            .then(result => {
+                document.getElementById("resultScore").textContent = `Score: ${result.score}`;
+                document.getElementById("resultRank").textContent = `Rank: ${result.rank}`;
+                document.getElementById("resultPercentage").textContent = `Percentage: ${result.percentage}%`;
+                document.getElementById("resultUsers").textContent = `Total Users: ${result.numberOfUsers}`;
+                document.getElementById("resultMessage").textContent = result.customizedMessage;
+                document.getElementById("resultContainer").classList.remove("hidden");
+            })
+            .catch(error => console.error("Error fetching results:", error));
+        }
+
+        function loadSavedQuizOptions() {
+            const savedQuizzesDropdown = document.getElementById("savedQuizzes");
+            savedQuizzesDropdown.innerHTML = '<option value="">Select a past quiz</option>';
+            Object.keys(savedQuizzes).forEach(id => {
+                const option = document.createElement("option");
+                option.value = id;
+                option.textContent = `Quiz ${id}`;
+                savedQuizzesDropdown.appendChild(option);
+            });
+            savedQuizzesDropdown.classList.remove("hidden");
+        }
+
+        function loadSavedQuiz() {
+            quizId = document.getElementById("savedQuizzes").value;
+            if (quizId) fetchQuiz();
+        }
+
+        function checkSubmissionStatus() {
+            const submitButton = document.getElementById("submitButton");
+            if (savedQuizzes[quizId]?.submitted) {
+                submitButton.disabled = true;
+                submitButton.classList.add("bg-gray-400", "cursor-not-allowed");
+                submitButton.classList.remove("bg-green-500");
+            }
+        }
+
+        if (userId) {
+            document.getElementById("loginContainer").classList.add("hidden");
+            document.getElementById("quizSelection").classList.remove("hidden");
+            loadSavedQuizOptions();
+        }
+    </script>
+</body>
+</html>

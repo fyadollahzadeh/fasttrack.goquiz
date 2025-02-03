@@ -1,0 +1,139 @@
+definitions:
+  api.UserAnswers:
+    properties:
+      answers:
+        items:
+          type: string
+        type: array
+    type: object
+  api.UserQuizResult:
+    properties:
+      customizedMessage:
+        type: string
+      numberOfUsers:
+        type: integer
+      percentage:
+        type: integer
+      rank:
+        type: integer
+      score:
+        type: integer
+    type: object
+  services.QuestionView:
+    properties:
+      choices:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      text:
+        type: string
+    type: object
+  services.QuizView:
+    properties:
+      id:
+        type: string
+      questions:
+        items:
+          $ref: '#/definitions/services.QuestionView'
+        type: array
+      title:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /get-quiz/{id}:
+    get:
+      description: Get a quiz by ID
+      parameters:
+      - description: Quiz ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.QuizView'
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Get a quiz by ID
+  /get-results/{id}:
+    get:
+      description: Get the result of a quiz
+      parameters:
+      - description: Quiz ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserQuizResult'
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Get the result of a quiz
+  /submit-answers/{id}:
+    post:
+      description: Submit answers for a quiz
+      parameters:
+      - description: Quiz ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Answers
+        in: body
+        name: answers
+        required: true
+        schema:
+          $ref: '#/definitions/api.UserAnswers'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Answers submitted successfully
+          schema:
+            type: string
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Submit answers for a quiz
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: userId
+    type: apiKey
+swagger: "2.0"
